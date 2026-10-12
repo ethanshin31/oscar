@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Comms from "./Comms";
 import Core, { type CoreState } from "./Core";
+import Globe from "./Globe";
 import { createRecognizer, pickVoice, speakable, takeSentences, transcriptOf, type Recognizer } from "@/lib/speech";
 
 type Turn = { role: "user" | "assistant"; content: string; at: number };
+export type Place = { name: string; lat: number; lon: number };
+type Located = Place & { source: "device" | "home" };
 
 const HISTORY_KEY = "oscar.history.v1";
 const VOICE_KEY = "oscar.voice.v1";
@@ -48,7 +52,7 @@ function greeting(name: string, now: Date) {
   return `${part}, ${name}.`;
 }
 
-export default function Hud({ userName, model }: { userName: string; model: string }) {
+export default function Hud({ userName, model, home }: { userName: string; model: string; home: Place }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [state, setState] = useState<CoreState>("idle");
   const [input, setInput] = useState("");
@@ -58,6 +62,7 @@ export default function Hud({ userName, model }: { userName: string; model: stri
   const [latency, setLatency] = useState<number | null>(null);
   const [online, setOnline] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [place, setPlace] = useState<Located>({ ...home, source: "home" });
 
   const abortRef = useRef<AbortController | null>(null);
   const recognizerRef = useRef<Recognizer | null>(null);
@@ -77,6 +82,13 @@ export default function Hud({ userName, model }: { userName: string; model: stri
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
+    // Use the device's position when allowed; otherwise stay on the home location.
+    navigator.geolocation?.getCurrentPosition(
+      (pos) =>
+        setPlace((p) => ({ ...p, lat: pos.coords.latitude, lon: pos.coords.longitude, source: "device" })),
+      () => {},
+      { maximumAge: 10 * 60 * 1000, timeout: 15000 },
+    );
     // Some browsers load voices asynchronously.
     window.speechSynthesis?.getVoices();
     return () => {
@@ -167,6 +179,7 @@ export default function Hud({ userName, model }: { userName: string; model: stri
             messages: history.map(({ role, content }) => ({ role, content })),
             now: new Date().toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }),
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            location: `${place.name} (${place.lat.toFixed(2)}, ${place.lon.toFixed(2)})`,
           }),
         });
         if (res.status === 401) {
@@ -213,7 +226,7 @@ export default function Hud({ userName, model }: { userName: string; model: stri
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [turns, speak, stopAll, voiceOn, online],
+    [turns, speak, stopAll, voiceOn, online, place],
   );
 
   const listen = useCallback(() => {
@@ -268,10 +281,10 @@ export default function Hud({ userName, model }: { userName: string; model: stri
 
   const busy = state === "thinking" || state === "searching";
   const lastReply = [...turns].reverse().find((t) => t.role === "assistant");
-  const recentAsks = turns.filter((t) => t.role === "user").slice(-5).reverse();
+  const recentAsks = turns.filter((t) => t.role === "user").slice(-3).reverse();
 
   return (
-    <div className="hud">
+    <div className={`hud ${turns.length ? "hud-active" : ""}`}>
       <div className="hud-grid" aria-hidden="true" />
 
       <header className="hud-top">
@@ -336,6 +349,15 @@ export default function Hud({ userName, model }: { userName: string; model: stri
             </div>
           </dl>
         </section>
+        <section className="glass card">
+          <p className="eyebrow">Location</p>
+          <Globe lon={place.lon} lat={place.lat} />
+          <p className="place-name">{place.name}</p>
+          <p className="muted mono place-coords">
+            {Math.abs(place.lat).toFixed(2)}° {place.lat >= 0 ? "N" : "S"}, {Math.abs(place.lon).toFixed(2)}°{" "}
+            {place.lon >= 0 ? "E" : "W"} · {place.source === "device" ? "GPS" : "Home"}
+          </p>
+        </section>
       </aside>
 
       <main className="center">
@@ -399,6 +421,7 @@ export default function Hud({ userName, model }: { userName: string; model: stri
             <p className="muted">Nothing yet.</p>
           )}
         </section>
+        <Comms />
       </aside>
 
       <form

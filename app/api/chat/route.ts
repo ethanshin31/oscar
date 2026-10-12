@@ -60,13 +60,15 @@ export async function POST(req: Request) {
     typeof clientTime === "string" && typeof timeZone === "string"
       ? `Current local time for the user: ${clientTime} (${timeZone}).`
       : `Current time (UTC): ${new Date().toISOString()}.`;
+  const location = (body as { location?: unknown }).location;
+  const locationNote = typeof location === "string" ? ` Approximate location: ${location.slice(0, 120)}.` : "";
 
   const envEffort = process.env.OSCAR_EFFORT as Effort | undefined;
   const effort: Effort = envEffort && EFFORTS.includes(envEffort) ? envEffort : "low";
 
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...history,
-    { role: "system", content: contextNote },
+    { role: "system", content: contextNote + locationNote },
   ];
 
   const encoder = new TextEncoder();

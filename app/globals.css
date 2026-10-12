@@ -205,6 +205,174 @@ button {
   grid-area: left;
 }
 
+.panel {
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.panel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Once a conversation starts, the core steps back so the transcript gets the height. */
+.hud-active {
+  --core-size: min(27vh, 250px);
+}
+
+.core {
+  transition: width 0.6s var(--ease-spring);
+}
+
+/* ---------- Location globe ---------- */
+
+.globe {
+  display: block;
+  width: min(100%, 196px);
+  aspect-ratio: 1;
+  margin: 4px auto 12px;
+}
+
+.place-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.card .place-coords {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+/* ---------- Calls and texts ---------- */
+
+.comms-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.sample-tag {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(245, 197, 107, 0.4);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+}
+
+.segmented button {
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.segmented button[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.comms-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.comms-list li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  animation: fade-up 0.35s var(--ease-spring) both;
+}
+
+.comms-list li:last-child {
+  border-bottom: 0;
+}
+
+.comms-icon {
+  font-size: 13px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.comms-icon.missed {
+  color: var(--red);
+}
+
+.comms-dot {
+  width: 8px;
+  height: 8px;
+  justify-self: center;
+  border-radius: 50%;
+}
+
+.comms-dot.unread {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.comms-body {
+  display: grid;
+  min-width: 0;
+}
+
+.comms-name {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.missed-text {
+  color: var(--red);
+}
+
+.comms-sub {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comms-time {
+  font-size: 11px;
+}
+
 .panel-right {
   grid-area: right;
   animation-delay: 0.08s;
@@ -323,7 +491,7 @@ button {
 
 .log {
   width: 100%;
-  max-width: 720px;
+  max-width: 580px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -410,7 +578,7 @@ button {
 .composer {
   grid-area: composer;
   width: 100%;
-  max-width: 720px;
+  max-width: 580px;
   justify-self: center;
   display: flex;
   align-items: flex-end;

@@ -9,6 +9,8 @@ A personal AI assistant in the spirit of J.A.R.V.I.S., with an Iron Man style HU
 - Voice: tap the mic (or press Space on a laptop) to talk. Oscar reads its reply aloud sentence by sentence and prefers a British voice when your device has one.
 - Sign-in with an access code. Each device stays signed in for 90 days.
 - Installs to the home screen as an app on iPhone, iPad, Android and Windows.
+- A spinning globe that marks where you are (your device's location, or your home location if you don't share it). Oscar also uses it to answer questions about weather and nearby places.
+- A calls and texts panel, showing sample data until a real phone source is connected.
 - Conversation history is kept on each device.
 
 ## Run it on your computer
@@ -28,6 +30,7 @@ Open http://localhost:3000 and unlock it with your `OSCAR_ACCESS_CODE`.
 | `ANTHROPIC_API_KEY` | Your Anthropic API key. It stays on the server and never reaches the browser. |
 | `OSCAR_ACCESS_CODE` | The passphrase that unlocks Oscar. Changing it signs out every device. |
 | `OSCAR_USER_NAME` | What Oscar calls you. Defaults to Peter. |
+| `OSCAR_HOME_NAME`, `OSCAR_HOME_LAT`, `OSCAR_HOME_LON` | Optional. The place the globe marks when a device doesn't share its location. Defaults to Mississippi. |
 | `OSCAR_EFFORT` | Optional. How hard Claude thinks: `low` (default, fastest for conversation), `medium`, `high`, `xhigh` or `max`. |
 
 ## Put it in the cloud

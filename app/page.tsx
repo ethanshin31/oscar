@@ -9,5 +9,10 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const jar = await cookies();
   if (!isValidSession(jar.get(SESSION_COOKIE)?.value)) redirect("/login");
-  return <Hud userName={process.env.OSCAR_USER_NAME || "Peter"} model={MODEL} />;
+  const home = {
+    name: process.env.OSCAR_HOME_NAME || "Mississippi, USA",
+    lat: Number(process.env.OSCAR_HOME_LAT) || 32.3,
+    lon: Number(process.env.OSCAR_HOME_LON) || -90.18,
+  };
+  return <Hud userName={process.env.OSCAR_USER_NAME || "Peter"} model={MODEL} home={home} />;
 }
