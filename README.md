@@ -10,6 +10,8 @@ A personal AI assistant in the spirit of J.A.R.V.I.S., with an Iron Man style HU
 - Sign-in with an access code. Each device stays signed in for 90 days.
 - Installs to the home screen as an app on iPhone, iPad, Android and Windows.
 - A spinning globe that marks where you are (your device's location, or your home location if you don't share it). Oscar also uses it to answer questions about weather and nearby places.
+- Atmospherics: live weather for your location from Open-Meteo (free, no key needed), with a 12-hour temperature trace.
+- Missions: a task list you can add to yourself, or by telling Oscar "remind me to…". Oscar also knows what's on it.
 - A calls and texts panel, showing sample data until a real phone source is connected.
 - Conversation history is kept on each device.
 

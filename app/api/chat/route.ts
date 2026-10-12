@@ -10,10 +10,29 @@ type Turn = { role: "user" | "assistant"; content: string };
 type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 const MAX_TURNS = 40;
-const MAX_CONTINUATIONS = 5;
+const MAX_ROUNDS = 6;
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh", "max"];
 
 const client = new Anthropic();
+
+const TOOLS: Anthropic.Beta.BetaToolUnion[] = [
+  { type: "web_search_20260209", name: "web_search", max_uses: 5 },
+  {
+    name: "add_mission",
+    description:
+      "Add a task to the user's Missions list on their HUD. Use when the user asks you to remember, track or remind them about something to do.",
+    strict: true,
+    eager_input_streaming: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short task title, under 80 characters, written as an action." },
+      },
+      required: ["title"],
+      additionalProperties: false,
+    },
+  },
+];
 
 function parseHistory(body: unknown): Turn[] | null {
   const messages = (body as { messages?: unknown })?.messages;
@@ -60,6 +79,15 @@ export async function POST(req: Request) {
     typeof clientTime === "string" && typeof timeZone === "string"
       ? `Current local time for the user: ${clientTime} (${timeZone}).`
       : `Current time (UTC): ${new Date().toISOString()}.`;
+  const missions = (body as { missions?: unknown }).missions;
+  const missionNote =
+    Array.isArray(missions) && missions.length
+      ? ` Open missions on the user's list: ${missions
+          .filter((m): m is string => typeof m === "string")
+          .slice(0, 20)
+          .map((m) => m.slice(0, 100))
+          .join("; ")}.`
+      : " The user's Missions list is empty.";
   const location = (body as { location?: unknown }).location;
   const locationNote = typeof location === "string" ? ` Approximate location: ${location.slice(0, 120)}.` : "";
 
@@ -68,7 +96,7 @@ export async function POST(req: Request) {
 
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...history,
-    { role: "system", content: contextNote + locationNote },
+    { role: "system", content: contextNote + locationNote + missionNote },
   ];
 
   const encoder = new TextEncoder();
@@ -78,7 +106,7 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
 
       try {
-        for (let i = 0; i <= MAX_CONTINUATIONS; i++) {
+        for (let round = 0; round < MAX_ROUNDS; round++) {
           const response = client.beta.messages.stream(
             {
               model: MODEL,
@@ -87,7 +115,7 @@ export async function POST(req: Request) {
               fallbacks: "default",
               output_config: { effort },
               system: systemPrompt(process.env.OSCAR_USER_NAME || "Peter"),
-              tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
+              tools: TOOLS,
               messages,
             },
             { signal: req.signal },
@@ -107,9 +135,32 @@ export async function POST(req: Request) {
             send({ t: "text", v: "I'm afraid I can't help with that one." });
             break;
           }
-          if (final.stop_reason !== "pause_turn") break;
-          // A long server-side search paused the turn; hand it back so Claude can continue.
+          if (final.stop_reason === "pause_turn") {
+            // A long server-side search paused the turn; hand it back so Claude can continue.
+            messages.push({ role: "assistant", content: final.content });
+            continue;
+          }
+          if (final.stop_reason !== "tool_use") break;
+
+          // Oscar's own tools run in the browser; the server only relays them.
+          const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+          for (const block of final.content) {
+            if (block.type !== "tool_use") continue;
+            const title = (block.input as { title?: unknown } | null)?.title;
+            if (block.name === "add_mission" && typeof title === "string" && title.trim()) {
+              send({ t: "mission", v: title.trim().slice(0, 120) });
+              results.push({ type: "tool_result", tool_use_id: block.id, content: "Added to the Missions list." });
+            } else {
+              results.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: "Invalid input: expected a non-empty title.",
+                is_error: true,
+              });
+            }
+          }
           messages.push({ role: "assistant", content: final.content });
+          messages.push({ role: "user", content: results });
         }
         send({ t: "done" });
       } catch (err) {

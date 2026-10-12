@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Comms from "./Comms";
 import Core, { type CoreState } from "./Core";
 import Globe from "./Globe";
+import Missions, { type Mission } from "./Missions";
+import Weather from "./Weather";
 import { createRecognizer, pickVoice, speakable, takeSentences, transcriptOf, type Recognizer } from "@/lib/speech";
 
 type Turn = { role: "user" | "assistant"; content: string; at: number };
@@ -12,6 +14,7 @@ type Located = Place & { source: "device" | "home" };
 
 const HISTORY_KEY = "oscar.history.v1";
 const VOICE_KEY = "oscar.voice.v1";
+const MISSIONS_KEY = "oscar.missions.v1";
 
 const QUICK_ACTIONS = [
   "Brief me on today",
@@ -63,6 +66,12 @@ export default function Hud({ userName, model, home }: { userName: string; model
   const [online, setOnline] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [place, setPlace] = useState<Located>({ ...home, source: "home" });
+  const [missions, setMissions] = useState<Mission[]>([]);
+
+  const addMission = useCallback((title: string, byOscar: boolean) => {
+    const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    setMissions((ms) => [...ms, { id, title, done: false, byOscar }]);
+  }, []);
 
   const abortRef = useRef<AbortController | null>(null);
   const recognizerRef = useRef<Recognizer | null>(null);
@@ -74,6 +83,8 @@ export default function Hud({ userName, model, home }: { userName: string; model
   useEffect(() => {
     setTurns(load<Turn[]>(HISTORY_KEY, []));
     setVoiceOn(load<boolean>(VOICE_KEY, true));
+    setMissions(load<Mission[]>(MISSIONS_KEY, []));
+    setHydrated(true);
     setCanListen(!!createRecognizer());
     setNow(new Date());
     setOnline(navigator.onLine);
@@ -98,8 +109,17 @@ export default function Hud({ userName, model, home }: { userName: string; model
     };
   }, []);
 
-  useEffect(() => save(HISTORY_KEY, turns.slice(-100)), [turns]);
-  useEffect(() => save(VOICE_KEY, voiceOn), [voiceOn]);
+  // Only write storage after it has been read, so the first render can't wipe saved data.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (hydrated) save(HISTORY_KEY, turns.slice(-100));
+  }, [turns, hydrated]);
+  useEffect(() => {
+    if (hydrated) save(VOICE_KEY, voiceOn);
+  }, [voiceOn, hydrated]);
+  useEffect(() => {
+    if (hydrated) save(MISSIONS_KEY, missions);
+  }, [missions, hydrated]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -179,6 +199,7 @@ export default function Hud({ userName, model, home }: { userName: string; model
             messages: history.map(({ role, content }) => ({ role, content })),
             now: new Date().toLocaleString(undefined, { dateStyle: "full", timeStyle: "short" }),
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            missions: missions.filter((m) => !m.done).map((m) => m.title),
             location: `${place.name} (${place.lat.toFixed(2)}, ${place.lon.toFixed(2)})`,
           }),
         });
@@ -207,6 +228,8 @@ export default function Hud({ userName, model, home }: { userName: string; model
               }
               if (!voiceOn) setState("speaking");
               appendReply(ev.v);
+            } else if (ev.t === "mission" && ev.v) {
+              addMission(ev.v, true);
             } else if (ev.t === "status" && ev.v === "searching") {
               setState("searching");
             } else if (ev.t === "error") {
@@ -226,7 +249,7 @@ export default function Hud({ userName, model, home }: { userName: string; model
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [turns, speak, stopAll, voiceOn, online, place],
+    [turns, speak, stopAll, voiceOn, online, place, missions, addMission],
   );
 
   const listen = useCallback(() => {
@@ -281,7 +304,6 @@ export default function Hud({ userName, model, home }: { userName: string; model
 
   const busy = state === "thinking" || state === "searching";
   const lastReply = [...turns].reverse().find((t) => t.role === "assistant");
-  const recentAsks = turns.filter((t) => t.role === "user").slice(-3).reverse();
 
   return (
     <div className={`hud ${turns.length ? "hud-active" : ""}`}>
@@ -394,33 +416,13 @@ export default function Hud({ userName, model, home }: { userName: string; model
       </main>
 
       <aside className="panel panel-right">
-        <section className="glass card">
-          <p className="eyebrow">Quick actions</p>
-          <div className="quick">
-            {QUICK_ACTIONS.map((q) => (
-              <button key={q} className="quick-btn" onClick={() => send(q)} disabled={busy}>
-                {q}
-              </button>
-            ))}
-          </div>
-        </section>
-        <section className="glass card">
-          <p className="eyebrow">Recent requests</p>
-          {recentAsks.length ? (
-            <ul className="recent">
-              {recentAsks.map((t) => (
-                <li key={t.at}>
-                  <span className="mono muted">
-                    {new Date(t.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  {t.content}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">Nothing yet.</p>
-          )}
-        </section>
+        <Weather lat={place.lat} lon={place.lon} />
+        <Missions
+          missions={missions}
+          onAdd={(title) => addMission(title, false)}
+          onToggle={(id) => setMissions((ms) => ms.map((m) => (m.id === id ? { ...m, done: !m.done } : m)))}
+          onClearDone={() => setMissions((ms) => ms.filter((m) => !m.done))}
+        />
         <Comms />
       </aside>
 
